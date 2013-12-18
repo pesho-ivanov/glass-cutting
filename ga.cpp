@@ -79,10 +79,18 @@ struct Tree {
       : item(_item), first(_first), second(_second), cut(_cut) {}
   };
 
+  struct Rect {
+    int id;
+    int x1, y1, x2, y2;
+
+    Rect(int _id, int _x1, int _y1, int _x2, int _y2) 
+      : id(_id), x1(_x1), y1(_y1), x2(_x2), y2(_y2) {}
+  };
+
   int n;
   vector<int> postfix; // includes HORIZONTAL, VERTICAL, 0, ..., n-1
   vector<bool> rots;
-  vector<Item> plot; // absolute lower-left positions of items
+  vector<Rect> plot; // absolute lower-left positions of items
   Node *root;
   int h, w;
 
@@ -93,7 +101,7 @@ struct Tree {
     build_postfix(state);
     build_tree();
     
-    pair<int, int> size = print_tree(root, 0, 0);
+    pair<int, int> size = plot_tree(root, 0, 0);
     w = size.first;
     h = size.second;
     fprintf(stderr, "size: (%d, %d)\n", w, h);
@@ -207,12 +215,12 @@ struct Tree {
     root = curr_operands[0];
   }
 
-  pair<int, int> print_tree(Node *v, int dx, int dy, int shift=0) {
+  pair<int, int> plot_tree(Node *v, int dx, int dy, int shift=0) {
     if (v != NULL) {
       fprintf(stderr, "%*s", shift, "");
       if (v->first == NULL && v->second == NULL) {
         Item item = v->item;
-        plot.push_back( Item(item.id, dx, dy) );
+        plot.push_back( Rect(item.id, dx, dy, dx + item.w, dy + item.h) );
         fprintf(stderr, "leaf: #%d (%d, %d -- %d, %d)\n", item.id, dx, dy, dx + item.w, dy + item.h);
         return make_pair(item.w, item.h);
       } else {
@@ -222,18 +230,18 @@ struct Tree {
 
       pair<int, int> d_first, d_second;
       if (v->first != NULL)
-        d_first = print_tree(v->first, dx, dy, shift+2);
+        d_first = plot_tree(v->first, dx, dy, shift+2);
 
       int dx_prev = dx, dy_prev = dy;
       if (v->second != NULL) {
         if (v->cut == HORIZONTAL) {
           dy += d_first.second;
-          d_second = print_tree(v->second, dx, dy, shift+2);
+          d_second = plot_tree(v->second, dx, dy, shift+2);
           dx += max(d_first.first, d_second.first);
           dy += d_second.second;
         } else {
           dx += d_first.first;
-          d_second = print_tree(v->second, dx, dy, shift+2);
+          d_second = plot_tree(v->second, dx, dy, shift+2);
           dx += d_second.first;
           dy += max(d_first.second, d_second.second);
         }
@@ -307,22 +315,45 @@ void visualize(Tree &tree, char *sketchps_fn) {
   fprintf(fout, "%d %d\n", tree.w, 0);
   fprintf(fout, "\n");
 
-  fprintf(fout, "colour black\n");
   for (int i=0; i<tree.plot.size(); i++) {
-    Item item = tree.plot[i]; // absolute coordinates
-    int dw = items[item.id].w;
-    int dh = items[item.id].h;
+    Tree::Rect rect = tree.plot[i]; // absolute coordinates
 
-    fprintf(fout, "polyline\n");
-    fprintf(fout, "%d %d\n", item.w, item.h);
-    fprintf(fout, "%d %d\n", item.w, item.h+dh);
-    fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
-    fprintf(fout, "%d %d\n", item.w+dw, item.h);
-    fprintf(fout, "%d %d\n", item.w, item.h);
-    fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
-    fprintf(fout, "%d %d\n", item.w+dw, item.h);
-    fprintf(fout, "%d %d\n", item.w, item.h+dh);
+    fprintf(fout, "colour gray\n");
+    fprintf(fout, "polygon*\n");
+    fprintf(fout, "%d %d\n", rect.x1, rect.y1);
+    fprintf(fout, "%d %d\n", rect.x1, rect.y2);
+    fprintf(fout, "%d %d\n", rect.x2, rect.y2);
+    fprintf(fout, "%d %d\n", rect.x2, rect.y1);
     fprintf(fout, "\n");
+
+    fprintf(fout, "colour black\n");
+    fprintf(fout, "polygon\n");
+    fprintf(fout, "%d %d\n", rect.x1, rect.y1);
+    fprintf(fout, "%d %d\n", rect.x1, rect.y2);
+    fprintf(fout, "%d %d\n", rect.x2, rect.y2);
+    fprintf(fout, "%d %d\n", rect.x2, rect.y1);
+    fprintf(fout, "\n");
+
+    fprintf(fout, "colour black\n");
+    fprintf(fout, "lines\n");
+    fprintf(fout, "%d %d %d %d\n", rect.x1, rect.y1, rect.x2, rect.y2);
+    fprintf(fout, "%d %d %d %d\n", rect.x2, rect.y1, rect.x1, rect.y2);
+    fprintf(fout, "\n");
+    
+    //Item item = tree.plot[i]; // absolute coordinates
+    //int dw = items[item.id].w;
+    //int dh = items[item.id].h;
+
+    //fprintf(fout, "polyline\n");
+    //fprintf(fout, "%d %d\n", item.w, item.h);
+    //fprintf(fout, "%d %d\n", item.w, item.h+dh);
+    //fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
+    //fprintf(fout, "%d %d\n", item.w+dw, item.h);
+    //fprintf(fout, "%d %d\n", item.w, item.h);
+    //fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
+    //fprintf(fout, "%d %d\n", item.w+dw, item.h);
+    //fprintf(fout, "%d %d\n", item.w, item.h+dh);
+    //fprintf(fout, "\n");
   }
 }
 
@@ -358,10 +389,11 @@ int main(int argn, char *args[])
   Tree best_tree = ga();
   visualize(best_tree, args[3]);
 
-  best_tree.print_tree(best_tree.root, 0, 0);
+  fprintf(stderr, "best tree:\n");
+  best_tree.plot_tree(best_tree.root, 0, 0);
   int best_fitness = best_tree.fitness();
 
-  printf("best fitness: %d(%.1lf%%)\n", best_fitness, 100.0*items_surface/best_fitness);
+  fprintf(stdout, "best fitness: %d(%.1lf%%)\n", best_fitness, 100.0*items_surface/best_fitness);
   
   return 0;
 }
