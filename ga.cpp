@@ -72,7 +72,7 @@ struct Tree {
     Node *first, *second; // children
     int cut; // if not leaf
 
-    Node(Item _item, Node *_first, Node *_second, bool _cut=0)
+    Node(Item _item, Node *_first, Node *_second, int _cut=0)
       : item(_item), first(_first), second(_second), cut(_cut) {}
   };
 
@@ -80,12 +80,21 @@ struct Tree {
   vector<int> postfix; // includes HORIZONTAL, VERTICAL, 0, ..., n-1
   vector<bool> rots;
   Node *root;
+  int h, w;
 
   Tree(State &state) {
     n = state.perm.size();
     build_postfix(state);
     build_tree();
-    print_tree(root, 0, 0);
+    
+    pair<int, int> size = print_tree(root, 0, 0);
+    w = size.first;
+    h = size.second;
+    fprintf(stderr, "size: (%d, %d)\n", w, h);
+  }
+
+  int fitness() {
+    return w*h;
   }
 
   void build_postfix(State &state) {
@@ -128,15 +137,17 @@ struct Tree {
     vector<Node *> curr_operands;
     Node *node;
 
+    fprintf(stderr, "build_tree()\n");
+
     for (int i=0; i<postfix.size(); i++) {
       int op = postfix[i];
       if (op == HORIZONTAL || op == VERTICAL) {
         assert(curr_operands.size() >= 2);
 
-        Node *first = curr_operands.back();
+        Node *second= curr_operands.back();
           curr_operands.pop_back();
 
-        Node *second = curr_operands.back();
+        Node *first = curr_operands.back();
           curr_operands.pop_back();
 
         Item item(99, 0, 0);
@@ -160,27 +171,41 @@ struct Tree {
     root = curr_operands[0];
   }
 
-  void print_tree(Node *v, int dx, int dy) {
+  pair<int, int> print_tree(Node *v, int dx, int dy, int shift=0) {
     if (v != NULL) {
-      if (v->first != NULL)
-        print_tree(v->first, dx, dy);
-
-      if (v->second != NULL) {
-        if (v->cut == HORIZONTAL)
-          dx += v->first->item.w;
-        else
-          dy += v->first->item.h;
-
-        print_tree(v->second, dx, dy);
-      }
-      
+      fprintf(stderr, "%*s", shift, "");
       if (v->first == NULL && v->second == NULL) {
         Item item = v->item;
         fprintf(stderr, "leaf: #%d (%d, %d -- %d, %d)\n", item.id, dx, dy, dx + item.w, dy + item.h);
+        return make_pair(item.w, item.h);
       } else {
-        //
+        assert(v->cut == HORIZONTAL || v->cut == VERTICAL);
+        fprintf(stderr, "cut: %s\n", v->cut == HORIZONTAL ? "H" : "V");
       }
+
+      pair<int, int> d_first, d_second;
+      if (v->first != NULL)
+        d_first = print_tree(v->first, dx, dy, shift+2);
+
+      int dx_prev = dx, dy_prev = dy;
+      if (v->second != NULL) {
+        if (v->cut == HORIZONTAL) {
+          dy += d_first.second;
+          d_second = print_tree(v->second, dx, dy, shift+2);
+          dx += max(d_first.first, d_second.first);
+          dy += d_second.second;
+        } else {
+          dx += d_first.first;
+          d_second = print_tree(v->second, dx, dy, shift+2);
+          dx += d_second.first;
+          dy += max(d_first.second, d_second.second);
+        }
+      }
+
+      return make_pair(dx-dx_prev, dy-dy_prev);
     }
+
+    return make_pair(0, 0);
   }
 
   ~Tree() {
@@ -207,8 +232,7 @@ void read_bins(char *infile) {
   while(bins.size() < n) {
     int id, h, w, num;
 
-    fscanf(in, "%d,%d,%d,%d", &id, &h, &w, &num);
-    //fprintf(stderr, "%d %d %d %d\n", id, h, w, num);
+    fscanf(in, "%d,%d,%d,%d", &id, &w, &h, &num);
 
     for(int j=0; j<num; j++) {
       Bin bin(curr_id++, h, w);
@@ -225,12 +249,7 @@ void read_items(char *infile) {
   int m;
   int id, h, w;
 
-  //fscanf(in, "%d", &m);
-  //items.reserve(m);
-
-  while (fscanf(in, "%d,%d,%d", &id, &h, &w) != EOF) {
-    //fprintf(stderr, "%d %d %d\n", id, h, w);
-
+  while (fscanf(in, "%d,%d,%d", &id, &w, &h) != EOF) {
     Item item(items.size(), h, w);
     items.push_back(item);
   }
@@ -241,7 +260,7 @@ void read_items(char *infile) {
 void ga() {
   State curr_state(items.size());
   Tree curr_tree(curr_state);
-
+  
 }
 
 int main(int argn, char *args[])
