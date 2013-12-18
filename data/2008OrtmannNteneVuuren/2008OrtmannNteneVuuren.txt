@@ -1,0 +1,4 @@
+Ortmann FG, Ntene N & van Vuuren JH, 2008, "New and improved level heuristics for the rectangular strip packing and variable-sized bin packing problems", European Journal of Operational Research (Submitted).
+
+Bin File Format: Reference, Height, Width, Number, Optimal X Position, Optimal Y Position
+Item File Format: Reference, Height, Width, Optimal X Position, Optimal Y Position

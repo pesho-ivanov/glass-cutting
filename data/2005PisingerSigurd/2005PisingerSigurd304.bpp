@@ -1,0 +1,25 @@
+    7        PROBLEM CLASS
+   20    5   N. OF ITEMS, N. OF BIN SIZES
+    4  304   RELATIVE AND ABSOLUTE N. OF INSTANCE
+  100  100   91   64   52   80   86   51   59   79   HBIN[1] WBIN[1] HBIN[2] WBIN[2] ...
+10000 4988 2992 3263 3593    BIN PROFIT[i]
+   20   73   H(I),W(I),I=1,...,N
+   31   84
+   37   77
+   55   78
+   31   84
+   33   71
+    4   93
+   13   76
+   53   54
+   98    2
+   33   82
+   82   65
+   39   97
+   21   70
+   23   79
+   74   26
+   35   47
+    8   82
+   75   76
+   55   99

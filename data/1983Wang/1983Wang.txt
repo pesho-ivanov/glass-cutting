@@ -1,0 +1,3 @@
+Wang PY, 1983, "Two algorithms for constrained two-dimensional cutting stock problems", Operations Research, 31(3), pp. 573--586.
+
+Format (bins & items): Reference, Height, Width, Number

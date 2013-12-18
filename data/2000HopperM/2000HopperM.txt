@@ -1,0 +1,6 @@
+Hopper E & Turton BCH, 2002, "Problem generators for rectangular packing problems", Studia Informatica Universalis, 2(1), pp. 123--136.
+
+Format (bins): Reference, Width, Height, Number
+Format (items): Reference, Width, Height
+
+Also in: Hopper E, 2000, "Two-dimensional packing utilising evolutionary algorithms and other meta-heuristic methods", PhD Dissertation, University of Wales, Cardiff.
