@@ -22,6 +22,10 @@ struct Item {
     : id(_id), h(_h), w(_w) {}
 };
 
+// not to be changed after read
+vector<Bin> bins;
+vector<Item> items;
+
 // GA individual as defined by (+rotation & multibins)
 // HEURISTICS FOR LARGE STRIP PACKING PROBLEMS
 // WITH GUILLOTINE PATTERNS: AN EMPIRICAL STUDY
@@ -63,19 +67,36 @@ struct State {
 struct Tree {
   enum { HORIZONTAL = -2, VERTICAL = -1 };
 
+  struct Node {
+    Item item; // if leaf
+    Node *first, *second; // children
+    int cut; // if not leaf
+
+    Node(Item _item, Node *_first, Node *_second, bool _cut=0)
+      : item(_item), first(_first), second(_second), cut(_cut) {}
+  };
+
+  int n;
   vector<int> postfix; // includes HORIZONTAL, VERTICAL, 0, ..., n-1
   vector<bool> rots;
+  Node *root;
 
   Tree(State &state) {
-    int n = state.perm.size();
+    n = state.perm.size();
+    build_postfix(state);
+    build_tree();
+    print_tree(root, 0, 0);
+  }
+
+  void build_postfix(State &state) {
     vector<int> curr_operands;
 
     rots = state.rots;
 
-    fprintf(stderr, "rots:");
-    for (int i=0; i<rots.size(); i++)
-      fprintf(stderr, " %d", int(rots[i]));
-    fprintf(stderr, "\n");
+    //fprintf(stderr, "rots:");
+    //for (int i=0; i<rots.size(); i++)
+    //  fprintf(stderr, " %d", int(rots[i]));
+    //fprintf(stderr, "\n");
 
     for (int i=0; i<n; i++) {
       postfix.push_back(state.perm[i]);
@@ -97,15 +118,83 @@ struct Tree {
         curr_operands.pop_back();
     }
 
+    fprintf(stderr, "postfix: ");
     for (int i=0; i<postfix.size(); i++)
       fprintf(stderr, " %d", postfix[i]);
     fprintf(stderr, "\n");
   }
-};
 
-// not to be changed after read
-vector<Bin> bins;
-vector<Item> items;
+  void build_tree() {
+    vector<Node *> curr_operands;
+    Node *node;
+
+    for (int i=0; i<postfix.size(); i++) {
+      int op = postfix[i];
+      if (op == HORIZONTAL || op == VERTICAL) {
+        assert(curr_operands.size() >= 2);
+
+        Node *first = curr_operands.back();
+          curr_operands.pop_back();
+
+        Node *second = curr_operands.back();
+          curr_operands.pop_back();
+
+        Item item(99, 0, 0);
+        if (op == HORIZONTAL) {
+          item.w = first->item.w + second->item.w;
+          item.h = max(first->item.h, second->item.h);
+        } else {
+          item.w = max(first->item.w, second->item.w);
+          item.h = first->item.h + second->item.h;
+        }
+
+        node = new Node(item, first, second, op);
+      } else {
+        node = new Node(items[op], NULL, NULL);
+      }
+
+      curr_operands.push_back(node);
+    }
+
+    assert(curr_operands.size() == 1);
+    root = curr_operands[0];
+  }
+
+  void print_tree(Node *v, int dx, int dy) {
+    if (v != NULL) {
+      if (v->first != NULL)
+        print_tree(v->first, dx, dy);
+
+      if (v->second != NULL) {
+        if (v->cut == HORIZONTAL)
+          dx += v->first->item.w;
+        else
+          dy += v->first->item.h;
+
+        print_tree(v->second, dx, dy);
+      }
+      
+      if (v->first == NULL && v->second == NULL) {
+        Item item = v->item;
+        fprintf(stderr, "leaf: #%d (%d, %d -- %d, %d)\n", item.id, dx, dy, dx + item.w, dy + item.h);
+      } else {
+        //
+      }
+    }
+  }
+
+  ~Tree() {
+    delete_subtree(root);
+  }
+
+  void delete_subtree(Node *v) {
+    if (v != NULL) {
+      delete_subtree(v->first);
+      delete_subtree(v->second);
+      delete v;
+    }
+  }
+};
 
 // Hopper format
 void read_bins(char *infile) {
@@ -149,13 +238,10 @@ void read_items(char *infile) {
   assert(!items.empty());
 }
 
-int fitness(const State &st) {
- 
-}
-
 void ga() {
   State curr_state(items.size());
   Tree curr_tree(curr_state);
+
 }
 
 int main(int argn, char *args[])
