@@ -38,32 +38,17 @@ struct State {
   vector<bool> optype;          // 'false' for vertical; 'true' for horizontal
   vector<int>  chainlen;        // chain len field
 
+  int fitness;
+
   State(int n, bool rand_perm=true, bool rand_rots=true,
-      bool rand_optype=true, bool rand_chainlen=true) {
-    perm.resize(n);
-    rots.resize(n, 0);
-    optype.resize(n, 0);
-    chainlen.resize(n, 1);
+      bool rand_optype=true, bool rand_chainlen=true);
 
-    for (int i=0; i<n; i++)
-      perm[i] = i;
-
-    if (rand_perm)
-      random_shuffle(perm.begin(), perm.end());
-
-    if (rand_rots)
-      for (int i=0; i<n; i++)
-        rots[i] = rand() % 2;
-
-    if (rand_optype)
-      for (int i=0; i<n; i++)
-        optype[i] = rand() % 2;
-
-    if (rand_chainlen)
-      for (int i=0; i<n; i++)
-        chainlen[i] = rand() % 3;
-  }
+  void evaluate();
 }; 
+
+bool operator<(const State &a, const State &b) {
+  return a.fitness < b.fitness;
+}
 
 // a tree is fully determined by a state
 struct Tree {
@@ -266,6 +251,38 @@ struct Tree {
   }
 };
 
+State::State(int n, bool rand_perm, bool rand_rots, bool rand_optype, bool rand_chainlen) {
+  perm.resize(n);
+  rots.resize(n, 0);
+  optype.resize(n, 0);
+  chainlen.resize(n, 1);
+
+  for (int i=0; i<n; i++)
+    perm[i] = i;
+
+  if (rand_perm)
+    random_shuffle(perm.begin(), perm.end());
+
+  if (rand_rots)
+    for (int i=0; i<n; i++)
+      rots[i] = rand() % 2;
+
+  if (rand_optype)
+    for (int i=0; i<n; i++)
+      optype[i] = rand() % 2;
+
+  if (rand_chainlen)
+    for (int i=0; i<n; i++)
+      chainlen[i] = rand() % 3;
+
+  evaluate();
+}
+
+void State::evaluate() {
+  Tree tree(*this);
+  fitness = tree.fitness();
+}
+
 // Hopper format
 void read_bins(char *infile) {
   FILE *in = fopen(infile, "r");
@@ -339,30 +356,15 @@ void visualize(Tree &tree, char *sketchps_fn) {
     fprintf(fout, "%d %d %d %d\n", rect.x1, rect.y1, rect.x2, rect.y2);
     fprintf(fout, "%d %d %d %d\n", rect.x2, rect.y1, rect.x1, rect.y2);
     fprintf(fout, "\n");
-    
-    //Item item = tree.plot[i]; // absolute coordinates
-    //int dw = items[item.id].w;
-    //int dh = items[item.id].h;
-
-    //fprintf(fout, "polyline\n");
-    //fprintf(fout, "%d %d\n", item.w, item.h);
-    //fprintf(fout, "%d %d\n", item.w, item.h+dh);
-    //fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
-    //fprintf(fout, "%d %d\n", item.w+dw, item.h);
-    //fprintf(fout, "%d %d\n", item.w, item.h);
-    //fprintf(fout, "%d %d\n", item.w+dw, item.h+dh);
-    //fprintf(fout, "%d %d\n", item.w+dw, item.h);
-    //fprintf(fout, "%d %d\n", item.w, item.h+dh);
-    //fprintf(fout, "\n");
   }
 }
 
-Tree ga() {
+Tree random_sampling() {
   int best_fitness = int(1e8);
   Tree best_tree;
 
   for(int i=0; i<3000; i++) {
-    State state(items.size(), true, false);
+    State state(items.size(), true, true);
     Tree tree(state);
  
     int fitness = tree.fitness();
@@ -377,6 +379,86 @@ Tree ga() {
   return best_tree;
 }
 
+// genetic algorithm
+struct GA {
+  static const int    POP_SIZE              = 64;
+  static const double perm_mutate_rate      = 0.03;
+  static const double rot_mutate_rate       = 0.03;
+  static const double optype_mutate_rate    = 0.03;
+  static const double chainlen_mutate_rate  = 0.03;
+
+  int n;
+  vector<State> pop;
+
+  bool coin(double rate) {
+    return 1.0*rand() / RAND_MAX < rate;
+  }
+
+  void mutate(State &st) {
+    for (int i=0; i<int(n*perm_mutate_rate); i++)
+      swap( st.perm[ rand() % n ], st.perm[ rand() % n] );
+
+    for (int i=0; i<n; i++)
+      if (coin(rot_mutate_rate))
+        st.rots[i] = !st.rots[i];
+
+    for (int i=0; i<n; i++)
+      if (coin(optype_mutate_rate))
+        st.optype[i] = !st.optype[i];
+
+    for (int i=0; i<n; i++) {
+      if (coin(chainlen_mutate_rate))
+        st.chainlen[i] ++;
+
+      if (st.chainlen[i] > 0 && coin(chainlen_mutate_rate))
+        st.chainlen[i] --;
+    }
+  }
+
+  void revaluate_all() {
+    for (int i=0; i<pop.size(); i++)
+      pop[i].evaluate();
+  }
+
+  void mutate_all() {
+    for (int i=0; i<pop.size(); i++)
+      mutate(pop[i]);
+  }
+
+  Tree run() {
+    n = items.size();
+    pop = vector<State>(POP_SIZE, State(n));
+    State best(n);
+
+    for(int gen=0; gen<500; gen++) {
+      revaluate_all();
+      sort(pop.begin(), pop.end());
+
+      for(int i=0; i<pop.size(); i++)
+        fprintf(stderr, "fitness: %d\n", pop[i].fitness);
+
+      if (pop[0] < best)
+        best = pop[0];
+
+      int half = pop.size() / 2;
+      copy(pop.begin(), pop.begin() + half, pop.begin() + half);
+
+      mutate_all();
+   
+      //int fitness = tree.fitness();
+      //if (fitness < best_fitness) {
+      //  best_fitness = fitness;
+      //  best_tree = tree;
+      //}
+
+      //printf("fitness #%d: %d(%.1lf%%)\n", gen, fitness, 100.0*items_surface/fitness);
+    }
+
+
+    return Tree(best);
+  }
+};
+
 int main(int argn, char *args[])
 {
   if (argn != 4) {
@@ -386,7 +468,10 @@ int main(int argn, char *args[])
   read_bins(args[1]);
   read_items(args[2]);
 
-  Tree best_tree = ga();
+  //Tree best_tree = random_sampling();
+  GA ga;
+  Tree best_tree = ga.run();
+  
   visualize(best_tree, args[3]);
 
   fprintf(stderr, "best tree:\n");
